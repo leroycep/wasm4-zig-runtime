@@ -1,6 +1,7 @@
 const std = @import("std");
+const mach = @import("./zig-deps/mach/build.zig");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.build.Builder) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -11,20 +12,31 @@ pub fn build(b: *std.build.Builder) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
-    const exe = b.addExecutable("wasm4-zig-runtime", "src/main.zig");
-    exe.setTarget(target);
-    exe.setBuildMode(mode);
-    exe.addPackagePath("zware", "zig-deps/zware/src/main.zig");
-    exe.install();
+    // Convert charset.png into an array of bits to embed
+    const charset_png_to_bits_exe = b.addExecutable("charset-png-to-bits", "tools/charset-png-to-bits.zig");
+    charset_png_to_bits_exe.addPackagePath("zigimg", "zig-deps/zigimg/zigimg.zig");
+    b.step("charset-png-to-bits", "Convert charset.png to a file containing raw bits").dependOn(&charset_png_to_bits_exe.run().step);
 
-    const run_cmd = exe.run();
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    const app = try mach.App.init(b, .{
+        .name = "wasm4-zig-runtime",
+        .src = "./src/main.zig",
+        .target = target,
+        .deps = &.{
+            .{
+                .name = "zware",
+                .source = .{ .path = "zig-deps/zware/src/main.zig" },
+            },
+            .{
+                .name = "zigimg",
+                .source = .{ .path = "zig-deps/zigimg/zigimg.zig" },
+            },
+        },
+    });
+    try app.link(.{});
+    app.install();
 
     const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    run_step.dependOn(try app.run());
 
     const exe_tests = b.addTest("src/main.zig");
     exe_tests.setTarget(target);
