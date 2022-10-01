@@ -483,7 +483,7 @@ fn wasm4TextUtf8(vm: *zware.VirtualMachine) zware.WasmError!void {
             while (i < FONT_CHAR_WIDTH) : (i += 1) {
                 if (pos[0] + i >= 160 or pos[1] + j >= 160) continue;
                 const is_text_pixel = FONT[(char_y + j) * FONT_WIDTH + (char_x + i)];
-                if (is_text_pixel == 1) {
+                if (is_text_pixel == 0) {
                     if (text_color) |color| {
                         setPixel(framebuffer, pos[0] + i, pos[1] + j, color);
                     }
