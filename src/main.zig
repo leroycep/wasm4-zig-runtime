@@ -345,12 +345,40 @@ fn wasm4BlitSub(vm: *zware.VirtualMachine) zware.WasmError!void {
     std.log.debug("blitSub {} {} {} {} {} {}", .{ sprite_ptr, x, y, width, height, flags });
 }
 fn wasm4Line(vm: *zware.VirtualMachine) zware.WasmError!void {
-    const y2 = vm.popOperand(u32);
-    const x2 = vm.popOperand(u32);
-    const y1 = vm.popOperand(u32);
-    const x1 = vm.popOperand(u32);
+    const memory = try vm.inst.getMemory(0);
 
-    std.log.debug("line {} {} {} {}", .{ x1, y1, x2, y2 });
+    const draw_colors = std.mem.readIntLittle(u16, memory.asSlice()[DRAW_COLORS..][0..2]);
+    const fill_color: u2 = if (draw_colors & 0x0F > 0) @intCast(u2, (draw_colors & 0x0F) - 1) else return;
+    const framebuffer = memory.asSlice()[FRAMEBUFFER..][0..FRAMEBUFFER_SIZE];
+
+    const y2 = vm.popOperand(i32);
+    const x2 = vm.popOperand(i32);
+    const y1 = vm.popOperand(i32);
+    const x1 = vm.popOperand(i32);
+
+    const dx = try std.math.absInt(x2 - x1);
+    const sx: i32 = if (x1 < x2) 1 else -1;
+    const dy = -try std.math.absInt(y2 - y1);
+    const sy: i32 = if (y1 < y2) 1 else -1;
+
+    var err = dx + dy;
+    var x = x1;
+    var y = y1;
+    while (true) {
+        if (x > 0 and x < 160 and y > 0 and y < 160) setPixel(framebuffer, @intCast(u32, x), @intCast(u32, y), fill_color);
+        if (x == x2 and y == y2) break;
+        const err2 = 2 * err;
+        if (err2 >= dy) {
+            if (x == x2) break;
+            err += dy;
+            x += sx;
+        }
+        if (err2 <= dx) {
+            if (y == x2) break;
+            err += dx;
+            y += sy;
+        }
+    }
 }
 fn wasm4Oval(vm: *zware.VirtualMachine) zware.WasmError!void {
     const height = vm.popOperand(u32);
