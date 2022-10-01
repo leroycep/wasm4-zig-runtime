@@ -217,15 +217,53 @@ pub fn deinit(app: *App, core: *mach.Core) void {
     _ = core;
 }
 
+const GamePad = packed struct(u8) {
+    button_1: bool,
+    button_2: bool,
+    _unused: u2,
+    left: bool,
+    right: bool,
+    up: bool,
+    down: bool,
+};
+
 pub fn update(app: *App, core: *mach.Core) !void {
     const instance = try app.store.instance(app.instanceIndex);
-    try instance.invoke("update", &.{}, &.{}, .{});
+    const instance_memory = try instance.getMemory(0);
+    const memory = instance_memory.asSlice();
+
+    const gamepads = @ptrCast(*[4]GamePad, memory[GAMEPADS..][0..GAMEPADS_SIZE]);
+    while (core.pollEvent()) |event| {
+        switch (event) {
+            .key_press => |ev| switch (ev.key) {
+                .left => gamepads[0].left = true,
+                .right => gamepads[0].right = true,
+                .up => gamepads[0].up = true,
+                .down => gamepads[0].down = true,
+                .z => gamepads[0].button_1 = true,
+                .x => gamepads[0].button_2 = true,
+                else => {},
+            },
+            .key_release => |ev| switch (ev.key) {
+                .left => gamepads[0].left = false,
+                .right => gamepads[0].right = false,
+                .up => gamepads[0].up = false,
+                .down => gamepads[0].down = false,
+                .z => gamepads[0].button_1 = false,
+                .x => gamepads[0].button_2 = false,
+                else => {},
+            },
+            else => {},
+        }
+    }
+
+    try instance.invoke("update", &.{}, &.{}, .{
+        .operand_stack_size = 4096,
+    });
 
     const back_buffer_view = core.swap_chain.?.getCurrentTextureView();
     defer back_buffer_view.release();
 
-    const instance_memory = try instance.getMemory(0);
-    const memory = instance_memory.asSlice();
     const palette = @ptrCast([*]align(4) u24, @alignCast(4, memory[PALETTE..].ptr))[0..4];
     const framebuffer = memory[FRAMEBUFFER..][0..6400];
 
@@ -287,6 +325,8 @@ const PALETTE = 0x0004;
 const FRAMEBUFFER = 0x00a0;
 const FRAMEBUFFER_SIZE = 6400;
 const DRAW_COLORS = 0x0014;
+const GAMEPADS = 0x0016;
+const GAMEPADS_SIZE = 4;
 
 const FONT = @embedFile("charset.bits");
 const FONT_WIDTH = 128;
