@@ -358,7 +358,7 @@ fn wasm4Oval(vm: *zware.VirtualMachine) zware.WasmError!void {
     const y = vm.popOperand(u32);
     const x = vm.popOperand(u32);
 
-    std.log.debug("{} {} {} {}", .{ x, y, width, height });
+    std.log.debug("oval {} {} {} {}", .{ x, y, width, height });
 }
 fn wasm4Rect(vm: *zware.VirtualMachine) zware.WasmError!void {
     const memory = try vm.inst.getMemory(0);
@@ -433,13 +433,21 @@ fn setPixel(framebuffer: []u8, x: u32, y: u32, color: u2) void {
 }
 
 fn wasm4Tone(vm: *zware.VirtualMachine) zware.WasmError!void {
-    _ = vm;
+    const flags = vm.popOperand(u32);
+    const volume = vm.popOperand(u32);
+    const duration = vm.popOperand(u32);
+    const frequency = vm.popOperand(u32);
+    std.log.debug("tone {} {} {} {}", .{ frequency, duration, volume, flags });
 }
 fn wasm4DiskR(vm: *zware.VirtualMachine) zware.WasmError!void {
-    _ = vm;
+    const size = vm.popOperand(u32);
+    const dest_ptr = vm.popOperand(u32);
+    std.log.debug("diskr {} {}", .{ dest_ptr, size });
 }
 fn wasm4DiskW(vm: *zware.VirtualMachine) zware.WasmError!void {
-    _ = vm;
+    const size = vm.popOperand(u32);
+    const src_ptr = vm.popOperand(u32);
+    std.log.debug("diskw {} {}", .{ src_ptr, size });
 }
 fn wasm4TraceUtf8(vm: *zware.VirtualMachine) zware.WasmError!void {
     const memory = try vm.inst.getMemory(0);
@@ -448,6 +456,14 @@ fn wasm4TraceUtf8(vm: *zware.VirtualMachine) zware.WasmError!void {
     std.log.debug("{s}", .{memory.asSlice()[str_ptr..][0..str_len]});
 }
 fn wasm4Tracef(vm: *zware.VirtualMachine) zware.WasmError!void {
-    _ = vm;
-    std.log.debug("Hi", .{});
+    const instance_memory = try vm.inst.getMemory(0);
+    const memory = instance_memory.asSlice();
+
+    const stack_ptr = vm.popOperand(u32);
+    const str_ptr = vm.popOperand(u32);
+
+    const str_len = std.mem.indexOfScalar(u8, memory[str_ptr..], 0) orelse memory[str_ptr..].len;
+    const str = memory[str_ptr..][0..str_len];
+
+    std.log.debug("{s} {}", .{ str, stack_ptr });
 }
