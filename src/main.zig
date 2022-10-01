@@ -10,7 +10,7 @@ vertex_buffer: *gpu.Buffer,
 bind_group: *gpu.BindGroup,
 framebuffer_texture: *gpu.Texture,
 
-framebuffer_rgba: [160][160][4]u8,
+framebuffer_rgba: [160][160]u32,
 
 arena: std.heap.ArenaAllocator,
 store: zware.Store,
@@ -201,7 +201,7 @@ pub fn init(app: *App, core: *mach.Core) !void {
     const instance_memory = try instance.getMemory(0);
     const memory = instance_memory.asSlice();
 
-    const palette = @ptrCast([*]u32, @alignCast(4, memory[PALETTE..].ptr))[0..4];
+    const palette = @ptrCast(*[4]u32, @alignCast(4, memory[PALETTE..]));
     palette.* = .{
         0xfff6d3,
         0xf9a875,
@@ -264,7 +264,7 @@ pub fn update(app: *App, core: *mach.Core) !void {
     const back_buffer_view = core.swap_chain.?.getCurrentTextureView();
     defer back_buffer_view.release();
 
-    const palette = @ptrCast([*]align(4) u24, @alignCast(4, memory[PALETTE..].ptr))[0..4];
+    const palette = @ptrCast(*[4]u32, @alignCast(4, memory[PALETTE..]));
     const framebuffer = memory[FRAMEBUFFER..][0..6400];
 
     // Upload framebuffer to gpu
@@ -274,14 +274,11 @@ pub fn update(app: *App, core: *mach.Core) !void {
         while (y < 160) : (y += 1) {
             var x: u16 = 0;
             while (x < 160) : (x += 1) {
-                const color_index = @truncate(u2, framebuffer[(y * 160 + x) / 4] >> @intCast(u3, (x & 0x03) * 2));
-                const color = palette[color_index];
-                app.framebuffer_rgba[y][x] = .{
-                    @truncate(u8, color),
-                    @truncate(u8, color >> 8),
-                    @truncate(u8, color >> 16),
-                    0xFF,
-                };
+                const index = y * 160 + x;
+                const color_byte = framebuffer[index >> 2];
+                const color_byte_shift = @as(u3, @truncate(u2, index)) * 2;
+                const color_index = @truncate(u2, color_byte >> color_byte_shift);
+                app.framebuffer_rgba[y][x] = palette[color_index] | 0xFF000000;
             }
         }
         core.device.getQueue().writeTexture(
@@ -334,15 +331,57 @@ const FONT_HEIGHT = 112;
 const FONT_CHAR_WIDTH = 8;
 const FONT_CHAR_HEIGHT = 8;
 
+const BlitFlags = packed struct(u32) {
+    bpp: enum(u1) { @"1bpp" = 0, @"2bpp" = 1 },
+    flip: packed struct(u2) {
+        x: bool,
+        y: bool,
+    },
+    rotate: bool,
+    _unused: u28,
+};
+
 fn wasm4BlitSub(vm: *zware.VirtualMachine) zware.WasmError!void {
-    const flags = vm.popOperand(u32);
+    const memory = try vm.inst.getMemory(0);
+    const mem = memory.asSlice();
+
+    const draw_colors = std.mem.readIntLittle(u16, mem[DRAW_COLORS..][0..2]);
+    const framebuffer = mem[FRAMEBUFFER..][0..FRAMEBUFFER_SIZE];
+
+    const flags = @bitCast(BlitFlags, vm.popOperand(u32));
+    const stride = vm.popOperand(u32);
+    const src_y = vm.popOperand(u32);
+    const src_x = vm.popOperand(u32);
     const height = vm.popOperand(u32);
     const width = vm.popOperand(u32);
     const y = vm.popOperand(u32);
     const x = vm.popOperand(u32);
     const sprite_ptr = vm.popOperand(u32);
 
-    std.log.debug("blitSub {} {} {} {} {} {}", .{ sprite_ptr, x, y, width, height, flags });
+    if (flags.bpp != .@"2bpp") {
+        std.log.debug("Unimplemented: 1bpp blit flag", .{});
+        return;
+    }
+
+    const sprite = mem[sprite_ptr..];
+
+    var j: u32 = 0;
+    while (j < height) : (j += 1) {
+        var i: u32 = 0;
+        while (i < width) : (i += 1) {
+            if (x + i >= 160 or y + j >= 160) continue;
+            const sprite_index = ((src_y + j) * stride + (src_x + i));
+            const sprite_draw_byte = sprite[sprite_index >> 2];
+            const sprite_draw_shift = @intCast(u3, 3 - @truncate(u2, sprite_index)) * 2;
+            const sprite_draw_color = @truncate(u2, sprite_draw_byte >> sprite_draw_shift);
+
+            const draw_color_command = @truncate(u4, draw_colors >> (@as(u4, sprite_draw_color) * 4));
+            if (draw_color_command == 0 or draw_color_command > 4) continue;
+            const color = @intCast(u2, draw_color_command - 1);
+
+            setPixel(framebuffer, x + i, y + j, color);
+        }
+    }
 }
 fn wasm4Line(vm: *zware.VirtualMachine) zware.WasmError!void {
     const memory = try vm.inst.getMemory(0);
