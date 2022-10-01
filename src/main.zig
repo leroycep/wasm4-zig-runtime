@@ -425,7 +425,11 @@ fn wasm4Oval(vm: *zware.VirtualMachine) zware.WasmError!void {
     const y = vm.popOperand(u32);
     const x = vm.popOperand(u32);
 
-    std.log.debug("oval {} {} {} {}", .{ x, y, width, height });
+    _ = x;
+    _ = y;
+    _ = width;
+    _ = height;
+    //std.log.debug("oval {} {} {} {}", .{ x, y, width, height });
 }
 fn wasm4Rect(vm: *zware.VirtualMachine) zware.WasmError!void {
     const memory = try vm.inst.getMemory(0);
@@ -526,11 +530,51 @@ fn wasm4Tracef(vm: *zware.VirtualMachine) zware.WasmError!void {
     const instance_memory = try vm.inst.getMemory(0);
     const memory = instance_memory.asSlice();
 
-    const stack_ptr = vm.popOperand(u32);
+    var stack_ptr = vm.popOperand(u32);
     const str_ptr = vm.popOperand(u32);
 
     const str_len = std.mem.indexOfScalar(u8, memory[str_ptr..], 0) orelse memory[str_ptr..].len;
     const str = memory[str_ptr..][0..str_len];
 
-    std.log.debug("{s} {}", .{ str, stack_ptr });
+    const State = enum {
+        default,
+        percent,
+    };
+    var state = State.default;
+    for (str) |char| {
+        switch (state) {
+            .default => switch (char) {
+                '%' => state = .percent,
+                else => std.debug.print("{c}", .{char}),
+            },
+            .percent => switch (char) {
+                'c' => {
+                    std.debug.print("{c}", .{memory[stack_ptr]});
+                    stack_ptr += 4;
+                },
+                'd' => {
+                    std.debug.print("{d}", .{std.mem.readIntLittle(u32, memory[stack_ptr..][0..4])});
+                    stack_ptr += 4;
+                },
+                'f' => {
+                    std.debug.print("{d}", .{@bitCast(f32, std.mem.readIntLittle(u32, memory[stack_ptr..][0..4]))});
+                    stack_ptr += 4;
+                },
+                'x' => {
+                    std.debug.print("{x}", .{std.mem.readIntLittle(u32, memory[stack_ptr..][0..4])});
+                    stack_ptr += 4;
+                },
+                's' => {
+                    const stack_str_ptr = stack_ptr;
+                    stack_ptr += 4;
+                    std.debug.print("{s}", .{@ptrCast([:0]u8, memory[stack_str_ptr..])});
+                },
+                else => {
+                    std.debug.print("{c}", .{char});
+                    state = .default;
+                },
+            },
+        }
+    }
+    std.debug.print("\n", .{});
 }
