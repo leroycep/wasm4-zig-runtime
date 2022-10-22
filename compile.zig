@@ -36,8 +36,12 @@ pub fn build(b: *std.build.Builder) !void {
     app.step.step.dependOn(&charset_png_to_bits_exe.run().step);
     app.install();
 
+    const run = app.step.run();
+    if (b.args) |args| {
+        run.addArgs(args);
+    }
     const run_step = b.step("run", "Run the app");
-    run_step.dependOn(try app.run());
+    run_step.dependOn(&run.step);
 
     const exe_tests = b.addTest("src/main.zig");
     exe_tests.setTarget(target);

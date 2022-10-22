@@ -7,7 +7,7 @@ const deps = [_]fetch.Dependency{
         .vcs = .{
             .git = .{
                 .url = "https://github.com/malcolmstill/zware.git",
-                .commit = "724e1669609dc2f41e904396257e0ff80cad1df6",
+                .commit = "7c1d909189e061601cab66235cf2830883d00aa2",
                 .recursive = true,
             },
         },
@@ -17,7 +17,7 @@ const deps = [_]fetch.Dependency{
         .vcs = .{
             .git = .{
                 .url = "https://github.com/hexops/mach.git",
-                .commit = "ec8ced475f0afdb4e213f1fa2191365d0db48978",
+                .commit = "219f4de4609ca1af60c64fec74d3ed6763308134",
                 .recursive = true,
             },
         },
@@ -27,7 +27,7 @@ const deps = [_]fetch.Dependency{
         .vcs = .{
             .git = .{
                 .url = "https://github.com/zigimg/zigimg.git",
-                .commit = "fff6ea92a00c5f6092b896d754a932b8b88149ff",
+                .commit = "bbe433b385804fd7ba8a1bc23bac1a26798eebea",
                 .recursive = true,
             },
         },

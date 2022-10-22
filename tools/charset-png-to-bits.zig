@@ -23,5 +23,5 @@ pub fn main() !void {
     }
 
     try std.fs.cwd().writeFile("src/charset.bits", pixels);
-    std.debug.print("width = {}, height = {}", .{ img.width, img.height });
+    std.debug.print("width = {}, height = {}\n", .{ img.width, img.height });
 }

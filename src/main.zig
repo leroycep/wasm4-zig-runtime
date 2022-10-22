@@ -3,6 +3,11 @@ const zware = @import("zware");
 const mach = @import("mach");
 const gpu = mach.gpu;
 
+const usage =
+    \\USAGE: wasm4-zig-runtime /path/to/cart.wasm
+    \\
+;
+
 pub const App = @This();
 
 pipeline: *gpu.RenderPipeline,
@@ -15,7 +20,7 @@ framebuffer_rgba: [160][160]u32,
 arena: std.heap.ArenaAllocator,
 store: zware.Store,
 module: zware.Module,
-instanceIndex: usize,
+instance: zware.Instance,
 
 const Vertex = struct {
     pos: [2]f32,
@@ -33,8 +38,24 @@ const VERTICES = [_]Vertex{
 };
 
 pub fn init(app: *App, core: *mach.Core) !void {
+    const stdout = std.io.getStdOut();
+
     app.arena = std.heap.ArenaAllocator.init(core.allocator);
     const allocator = app.arena.allocator();
+
+    errdefer |e| {
+        std.fmt.format(stdout.writer(), "Encountered an error while running: {s}\n", .{@errorName(e)}) catch {};
+        _ = stdout.write(usage) catch 0;
+        app.arena.deinit();
+        std.os.exit(0);
+    }
+
+    const args = try std.process.argsAlloc(allocator);
+    defer allocator.free(args);
+
+    if (args.len < 2) {
+        return error.MissingPathToCart;
+    }
 
     const framebuffer_shader_module = core.device.createShaderModuleWGSL("frambuffer.wgsl", @embedFile("./framebuffer.wgsl"));
     defer framebuffer_shader_module.release();
@@ -99,7 +120,7 @@ pub fn init(app: *App, core: *mach.Core) !void {
     );
 
     // Load WASM4 cart
-    const cart_bytes = try std.fs.cwd().readFileAlloc(allocator, "./cart.wasm", 65 * 1024 * 1024);
+    const cart_bytes = try std.fs.cwd().readFileAlloc(allocator, args[1], 65 * 1024 * 1024);
 
     app.store = zware.Store.init(allocator);
     // Drawing
@@ -194,11 +215,10 @@ pub fn init(app: *App, core: *mach.Core) !void {
     var module = zware.Module.init(allocator, cart_bytes);
     try module.decode();
 
-    app.instanceIndex = try app.store.addInstance(zware.Instance.init(allocator, &app.store, module));
-    const instance = try app.store.instance(app.instanceIndex);
-    try instance.instantiate(app.instanceIndex);
+    app.instance = zware.Instance.init(allocator, &app.store, module);
+    try app.instance.instantiate();
 
-    const instance_memory = try instance.getMemory(0);
+    const instance_memory = try app.store.memory(0);
     const memory = instance_memory.asSlice();
 
     const palette = @ptrCast(*[4]u32, @alignCast(4, memory[PALETTE..]));
@@ -209,7 +229,7 @@ pub fn init(app: *App, core: *mach.Core) !void {
         0x7c3f58,
     };
 
-    try instance.invoke("start", &.{}, &.{}, .{});
+    try app.instance.invoke("start", &.{}, &.{}, .{});
 }
 
 pub fn deinit(app: *App, core: *mach.Core) void {
@@ -228,7 +248,7 @@ const GamePad = packed struct(u8) {
 };
 
 pub fn update(app: *App, core: *mach.Core) !void {
-    const instance = try app.store.instance(app.instanceIndex);
+    var instance = app.instance;
     const instance_memory = try instance.getMemory(0);
     const memory = instance_memory.asSlice();
 
