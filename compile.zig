@@ -33,6 +33,7 @@ pub fn build(b: *std.build.Builder) !void {
         },
     });
     try app.link(.{});
+    app.step.step.dependOn(&charset_png_to_bits_exe.run().step);
     app.install();
 
     const run_step = b.step("run", "Run the app");
