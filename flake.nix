@@ -16,6 +16,7 @@
     in {
       devShell.x86_64-linux = pkgs.mkShell {
         packages = [
+          pkgs.git
           pkgs.glibc
           zig-overlay.packages.x86_64-linux.master
           pkgs.xorg.libX11

@@ -17,7 +17,7 @@ const deps = [_]fetch.Dependency{
         .vcs = .{
             .git = .{
                 .url = "https://github.com/hexops/mach.git",
-                .commit = "219f4de4609ca1af60c64fec74d3ed6763308134",
+                .commit = "a2c6319bc4e99d034f89cd614426ea39e5de0a31",
                 .recursive = true,
             },
         },

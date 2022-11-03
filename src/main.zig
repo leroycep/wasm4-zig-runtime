@@ -334,7 +334,7 @@ pub fn update(app: *App, core: *mach.Core) !void {
     render_pass.end();
 
     const command = encoder.finish(null);
-    core.device.getQueue().submit(&.{command});
+    core.device.getQueue().submit(&[_]*const gpu.CommandBuffer{command});
     core.swap_chain.?.present();
 }
 
